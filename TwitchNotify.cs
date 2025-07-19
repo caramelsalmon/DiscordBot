@@ -78,7 +78,7 @@ class Program
                                 .WithTitle("📢 XXX開台拉！")
                                 .WithDescription(streamInfo.Value.Title)
                                 .WithColor(new Color(6570404))  //  紫色
-                                .WithImageUrl($"https://static-cdn.jtvnw.net/previews-ttv/live_user_{TwitchChannelName}-1280x720.jpg")  //  縮圖
+                                .WithImageUrl(streamInfo.Value.ThumbnailUrl)
                                 .WithTimestamp(DateTimeOffset.UtcNow)
                                 .Build();
 
@@ -101,23 +101,30 @@ class Program
         }
     }
     //  取得實況資訊
-    private static async Task<(string Title, string GameName)?> GetTwitchStreamInfo(string channelName)
+    private static async Task<(string Title, string GameName, string ThumbnailUrl)?> GetTwitchStreamInfo(string channelName)
     {
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Add("Client-Id", TwitchClientId);
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {TwitchAccessToken}");
+        
         var response = await client.GetAsync($"https://api.twitch.tv/helix/streams?user_login={channelName}");
         response.EnsureSuccessStatusCode();
         var content = await response.Content.ReadAsStringAsync();
         var json = JsonDocument.Parse(content);
         var streamData = json.RootElement.GetProperty("data");
-
+    
         if (streamData.GetArrayLength() > 0)
         {
             var stream = streamData[0];
             var title = stream.GetProperty("title").GetString();
             var gameName = stream.GetProperty("game_name").GetString();
-            return (title, gameName);
+            var thumbnailUrl = stream.GetProperty("thumbnail_url").GetString();
+    
+            // 替換模板參數為實際尺寸並添加時間戳
+            thumbnailUrl = thumbnailUrl.Replace("{width}", "1280").Replace("{height}", "720");
+            thumbnailUrl += $"?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+    
+            return (title, gameName, thumbnailUrl);
         }
         return null;
     }
